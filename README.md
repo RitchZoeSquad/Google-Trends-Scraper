@@ -1,67 +1,51 @@
-# Google Trends Scraper
+# Google Trends Scraper (Simple & Enriched)
 
-A Python-based tool to scrape "Trending Now" data from Google Trends (US region) using Playwright. It offers both a Command Line Interface (CLI) and a REST API.
+This project provides two versions of a Google Trends scraper:
+1.  **Simple**: Scrapes only the trending titles and volumes.
+2.  **Enriched**: Scrapes trends AND performs a Google Search for each using the Outscraper API.
 
-## Prerequisites
+## 🚀 Simple Version (Trends Only)
 
-- Python 3.8+
-- Linux/macOS/Windows (Scripts provided are for bash)
-
-## Installation & Usage
-
-### 1. CLI Scraper
-
-Run the scraper directly to fetch trends and save them to a JSON file.
-
+### CLI
 ```bash
 ./start.sh
 ```
+- Saves to: `trends.json`
 
-This will:
-1.  Set up a virtual environment.
-2.  Install dependencies.
-3.  Scrape data from Google Trends.
-4.  Save the output to `trends.json` and print it to the console.
-
-### 2. API Server
-
-Start the FastAPI server to access trends via HTTP.
-
+### API
 ```bash
 ./start_api.sh
 ```
+- Endpoint: `GET http://127.0.0.1:8000/trends`
 
-Once the server is running (default: http://127.0.0.1:8000), you can access the following:
+---
 
-### Endpoints
-- **Health Check**: `GET http://127.0.0.1:8000/`
-- **Get Trends**: `GET http://127.0.0.1:8000/trends`
-- **Interactive Docs**: `GET http://127.0.0.1:8000/docs` (Swagger UI)
+## 💎 Enriched Version (Trends + Search)
+*Uses Outscraper API Key: `ZDdjMzJl...`*
 
-### Usage Examples
-
-#### 1. Browser
-Open [http://127.0.0.1:8000/trends](http://127.0.0.1:8000/trends) in your web browser to see the JSON output.
-
-#### 2. Command Line (curl)
+### CLI (Automatic Search)
 ```bash
-curl http://127.0.0.1:8000/trends
+./start_enriched.sh
 ```
+- Automatically scrapes and then searches the top 5 trends.
+- Saves to: `trends_enriched.json`
 
-#### 3. Python Code
-```python
-import requests
-
-response = requests.get("http://127.0.0.1:8000/trends")
-trends = response.json()["data"]
-for item in trends:
-    print(f"{item['title']}: {item['search_volume']}")
+### API (On-demand Search)
+```bash
+./start_api_enriched.sh
 ```
+- Endpoint: `GET http://127.0.0.1:8001/trends/enriched?limit=5`
+- Port: **8001** (to avoid conflict with simple API)
+
+---
+
+## Prerequisites
+- Python 3.8+
+- Playwright (installed automatically by scripts)
 
 ## Files
-
--   `scraper.py`: Core logic for scraping Google Trends.
--   `api.py`: FastAPI application serving the scraper.
--   `requirements.txt`: Python dependencies.
--   `start.sh`: Helper script for the CLI.
--   `start_api.sh`: Helper script for the API.
+- `scraper.py`: Core trend scraping logic.
+- `search.py`: Outscraper API search logic.
+- `scraper_enriched.py`: CLI script for automatic search.
+- `api.py`: Simple API.
+- `api_enriched.py`: Enriched API.

@@ -33,56 +33,71 @@ async def get_trends():
         # Give it a bit more time for the JS to execute
         await page.wait_for_timeout(5000)
         
-        # Capture rows
-        rows = await page.locator("tr").all()
+        # Scroll down to ensure lazy-loaded elements appear
+        await page.mouse.wheel(0, 1000)
+        await page.wait_for_timeout(2000)
         
         trends = []
-        print(f"Found {len(rows)} potential rows.")
-
+        
+        # Strategy 1: Look for the classic table structure
+        rows = await page.locator("tr").all()
+        print(f"Strategy 1 (Table): Found {len(rows)} rows.")
+        
         for row in rows:
             try:
                 text_content = await row.inner_text()
                 lines = [line.strip() for line in text_content.split('\n') if line.strip()]
-                
                 if len(lines) >= 2:
+                    # Check for rank (digit) to confirm it's a trend row
                     if lines[0].isdigit():
-                        title = lines[1]
-                        volume = lines[2] if len(lines) > 2 else "Unknown"
-                    else:
-                        title = lines[0]
-                        volume = lines[1] if len(lines) > 1 else "Unknown"
-                    
-                    if title and len(title) > 1:
-                        # Filter out known headers/junk
-                        if title.lower() in ["search", "trending now", "rss feed"]:
-                            continue
-                        trends.append({
-                            "title": title,
-                            "search_volume": volume
-                        })
-            except Exception:
+                        trends.append({"title": lines[1], "search_volume": lines[2] if len(lines) > 2 else "Unknown"})
+                    elif len(lines) > 1:
+                         # Sometimes rank isn't first text
+                        trends.append({"title": lines[0], "search_volume": lines[1]})
+            except:
                 continue
 
-        # Fallback selector logic
+        # Strategy 2: Look for Material Design List Items (common in new UI)
         if not trends:
-            print("Trying alternative selectors...")
-            items = await page.locator("div[role='row']").all()
-            for item in items:
+            print("Strategy 1 failed. Trying Strategy 2 (List Items)...")
+            # This selector targets the specific grid/list items in the daily trends view
+            # "md-list-item" or generic divs with specific class patterns
+            
+            # This selector looks for the 'feed-item' or specific trend rows
+            # We try a few common patterns found in the DOM
+            candidates = await page.locator("div[class*='feed-item'], div[class*='row'], div[jsname]").all()
+            
+            for item in candidates:
                 text = await item.inner_text()
-                lines = [line.strip() for line in text.split('\n') if line.strip()]
-                if len(lines) >= 2:
-                    trends.append({
-                        "title": lines[1] if lines[0].isdigit() else lines[0],
-                        "search_volume": lines[2] if lines[0].isdigit() and len(lines) > 2 else (lines[1] if len(lines) > 1 else "Unknown")
+                lines = [l.strip() for l in text.split('\n') if l.strip()]
+                
+                # A valid trend block usually has: Rank, Title, Traffic
+                # Example: "1\nReal Madrid\n50K+"
+                if len(lines) >= 3 and lines[0].isdigit() and ("K+" in lines[-1] or "M+" in lines[-1]):
+                     trends.append({
+                        "title": lines[1],
+                        "search_volume": lines[-1] # Volume is often last
                     })
+        
+        # Strategy 3: Target "title" class specifically
+        if not trends:
+            print("Strategy 2 failed. Trying Strategy 3 (Specific Classes)...")
+            titles = await page.locator("div[class*='title']").all()
+            for t_el in titles:
+                t_text = await t_el.inner_text()
+                if t_text and len(t_text) > 2 and t_text.lower() != "search":
+                    # Try to find volume nearby (parent's sibling or similar)
+                    # For now, just getting titles is better than nothing
+                    trends.append({"title": t_text.strip(), "search_volume": "N/A"})
 
-        # Filter duplicates
+        # Filter duplicates and junk
         seen = set()
         unique_trends = []
         for t in trends:
-            if t['title'].lower() not in seen:
+            clean_title = t['title'].lower().strip()
+            if clean_title not in seen and clean_title not in ["search", "daily search trends", "realtime search trends"]:
                 unique_trends.append(t)
-                seen.add(t['title'].lower())
+                seen.add(clean_title)
         
         await browser.close()
         return unique_trends
